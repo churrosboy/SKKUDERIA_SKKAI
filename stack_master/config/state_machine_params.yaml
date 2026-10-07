@@ -1,0 +1,48 @@
+state_machine:
+  ros__parameters:
+    rate_hz: 40  # [hz]
+    initial_state: 'GB_TRACK'  # "GB_TRACK", ...
+    test_on_car: True  # also set True if using on a bag
+    n_loc_wpnts: 80  # number of local waypoints published, 1 waypoints every 0.1 meter
+
+    volt_threshold: 11. # [V] voltage threshold below which we start screaming
+
+    force_state: False  # force state to be the one specified in force_state_choice
+
+
+    splini_ttl: 2. # [s] ttl counter for validity of spliner waypoints -> NOW DYNAMIC RECONFIGURABLE
+
+    gb_ego_width_m: 0.4 # [m], distance from gb path for rejoining 
+    lateral_width_gb_m: 0.8 # [m] lateral width within which we consider obstacles to be on the overtaking line -> NOW DYNAMIC RECONFIGURABLE
+    gb_horizon_m: 6.9 # [m] horizon considered for the global waypoints to check for obstacles
+
+    overtaking_horizon_m: 6.0 #6.9 # [m] horizon considered for overtaking
+    # lateral_width_ot_m: 0.1 # [m] lateral width within which we consider opponents to be on the overtaking line -> NOW DYNAMIC RECONFIGURABLE
+    lateral_width_ot_m: 0.15 # [m] lateral width within which we consider opponents to be on the overtaking line -> NOW DYNAMIC RECONFIGURABLE (descriptor step 0.1->0.05 to allow this value)
+    # splini_hyst_timer_sec: 0.2 # [s] (pre-2026-08-26)
+    splini_hyst_timer_sec: 0.15 # [s] 2026-08-26: 0.2->0.15 (descriptor step 0.1->0.05), shorter forced TRAILING dwell before OVERTAKE (side-switch hysteresis, dynamic reconfigurable)
+
+    # ftg_threshold_speed: 0.1 # [m/s] speed threshold below which we start a timer for activating FTG
+    ftg_threshold_speed: 1.0 # [m/s] 2026-08-22: raised above trailing_min_speed (0.8 creep) so the FTG timer runs WHILE creeping in TRAILING instead of only after the car stops at trailing_stop_gap; 0.1 = old stopped-only trigger
+    # ftg_timer_sec: 3. # [s] time we have to stay slower than the `ftg_threshold_speed` threshold before we activate FTG
+    # ftg_timer_sec: 0.1 # [s] 0.1 s * 40 Hz = counter threshold 4 -> near-instant FTG when stuck
+    # ftg_timer_sec: 0.5 # [s] emergency-only: give TRAILING->OVERTAKE time to engage before FTG takes over
+    ftg_timer_sec: 0.3 # [s] 2026-08-22: 0.5 -> 0.3 (12 ticks @ 40 Hz) together with ftg_threshold_speed 1.0 -> faster FTG while creeping in TRAILING
+    # ftg_active: False # enable FTG emergency evasion (TRAILING -> FTGONLY when stuck) -> DYNAMIC RECONFIGURABLE
+    ftg_active: True # enable FTG emergency evasion (TRAILING -> FTGONLY when stuck) -> DYNAMIC RECONFIGURABLE
+    ftg_release_angle_deg: 70. # [deg] obstacle bearing beyond this = passed/not blocking -> early release back to GB_TRACK -> DYNAMIC RECONFIGURABLE
+
+    enable_collision_state: True # COLLISION state override while collision_stop recovery is active -> DYNAMIC RECONFIGURABLE (kill switch)
+
+    # 2026-08-18 TRAILING stability port (unicorn-style) -> ALL DYNAMIC RECONFIGURABLE
+    ot_closing_speed_min: 0.3 # [m/s] TRAILING->OVERTAKE vs dynamic only while cur_vs - opp.vs exceeds this; <=0 disables the gate
+    static_ot_anywhere: True # allow overtaking ALL-STATIC blockers outside OT sectors (sector gate then only restricts dynamic OT); False = sector-only (old behavior)
+    # static_ot_confirm_sec: 0.5 # [s] (pre-2026-08-26)
+    static_ot_confirm_sec: 0.15 # [s] 2026-08-26: 0.5->0.15 (6 ticks @40Hz) so a static blocker is overtakeable before the trailing PID bleeds speed
+    direct_static_overtake: True # 2026-08-26: GB_TRACK -> OVERTAKE directly for ALL-STATIC blockers when a valid obstacle-free spline exists (skips the TRAILING dwell); False = old TRAILING-first behavior
+
+    # 2026-08-19 RECOVERY state (smooth re-merge onto the raceline via extended lookahead) -> ALL DYNAMIC RECONFIGURABLE
+    enable_recovery_state: True # kill switch: False = old behavior (direct returns to GB_TRACK)
+    recovery_enter_d_m: 0.5 # [m] GB_TRACK -> RECOVERY when |d| exceeds this
+    recovery_exit_d_m: 0.25 # [m] RECOVERY -> GB_TRACK when |d| below this (hysteresis vs enter)
+

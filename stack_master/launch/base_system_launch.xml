@@ -1,0 +1,112 @@
+<!-- -*- mode: XML -*- -->
+<launch>
+  <arg name="racecar_version" default="$(env RACECAR_VERSION)" description="'SIM' / 'NUCx'" />
+  <arg name="map_name" default="latest" description="Map name in stack_master/maps" />
+  <arg name="sim" default="False" description="True/False if you want to run simulation" />
+  <arg name="loc_algorithm" default="slam" description="'slam' / 'synpf' to switch localisation algorithm" />
+  <!-- 2026-08-20: loc_lua:=f110_2d_loc_imu.lua feeds the gyro directly into
+       cartographer (use_imu_data=true); default is the old IMU-less behavior -->
+  <arg name="loc_lua" default="f110_2d_loc.lua" description="cartographer localization lua basename" />
+  <!-- 2026-08-22: RViz 2D Pose Estimate refines the click against /map with the live
+       /scan before restarting cartographer (scan visibly snaps on click).
+       initialpose_snap:=False = old raw-click restart. -->
+  <arg name="initialpose_snap" default="True" description="scan-to-map snap on RViz 2D Pose Estimate" />
+  <!-- 2026-08-26 hand-guided collision recovery: odom_gate drops odometry to
+       cartographer while collision_stop holds the car; collision_reloc:=True arms the
+       initialpose bridge to relocalize after the car is pushed back on track
+       (needs initialpose_snap:=True). See TUNING.md 6f. -->
+  <arg name="odom_gate" default="True" description="gate odometry to cartographer during a collision_stop recovery" />
+  <arg name="collision_reloc" default="False" description="auto-relocalize after a hand-guided collision recovery" />
+  <!-- 2026-08-25: collision_stop implementation (bringup_launch.py collision_exec):
+       collision_stop = python (default), collision_stop_cpp = C++ port (2026-08-22) -->
+  <!-- <arg name="collision_exec" default="collision_stop" description="collision_stop (python) or collision_stop_cpp (C++ port)" /> -->
+  <arg name="collision_exec" default="collision_stop_cpp" description="collision_stop_cpp (C++ port, default since 2026-08-25) or collision_stop (python)" />
+  <!-- 2026-08-26b: stop-only collision handling. False = no reverse: the car latches at
+       the trip, publishes the crash prior and waits to be put back on the track
+       (collision_reloc:=True snaps it onto the map, or press A to reset). True = the
+       previous reverse-and-recover behaviour (collision_stop enable_auto_recovery). -->
+  <arg name="collision_reverse" default="False" description="reverse 1 s after a collision trip (True) or stop-and-latch only (False)" />
+  <!-- 2026-08-20: straight-sector EKF blend in carstate (see straight_blender.py);
+       needs is_straight flags in the map's speed_scaling.yaml -->
+  <arg name="straight_ekf_blend_enable" default="False" description="blend EKF s on is_straight sectors" />
+  <arg name="rviz" default="False" description="Open RViz with the race view" />
+
+  <!-- Note: This is merely the share path (read-only) as the base_system
+    is not expected to modify maps in any way. -->
+  <let name="map_path" value="$(find-pkg-share stack_master)/maps/$(var map_name)" />
+
+  <!-- launch simulator -->
+  <group if="$(var sim)">
+    <include file="$(find-pkg-share f1tenth_gym_ros)/launch/gym_bridge_launch.py">
+      <arg name="map_yaml_path" value="$(var map_path)/$(var map_name).yaml" />
+      <arg name="rviz" value="$(var rviz)" /> <!-- 2026-08-25: headless sim on Jetson -->
+    </include>
+    <!-- only needed in sim -->
+    <include file="$(find-pkg-share frenet_odom_republisher)/launch/frenet_odom_republisher_launch.xml" />
+  </group>
+
+  <!-- launch real car system -->
+  <group unless="$(var sim)">
+    <!-- launch teleop stack -->
+    <include file="$(find-pkg-share stack_master)/launch/teleop_launch.xml">
+      <arg name="racecar_version" value="$(var racecar_version)" />
+      <arg name="collision_exec" value="$(var collision_exec)" /> <!-- 2026-08-25 C++ collision_stop switch -->
+      <arg name="collision_reverse" value="$(var collision_reverse)" /> <!-- 2026-08-26b stop-only switch -->
+    </include>
+
+    <!-- launch SE -->
+    <include file="$(find-pkg-share state_estimation)/launch/state_estimation_launch.xml">
+      <arg name="racecar_version" value="$(var racecar_version)" />
+      <arg name="mapping_bool" value="False" />
+      <arg name="map_name" value="$(var map_name)" />
+      <arg name="frenet_bool" value="True" />
+      <arg name="loc_lua" value="$(var loc_lua)" />
+      <arg name="initialpose_snap" value="$(var initialpose_snap)" />
+      <arg name="odom_gate" value="$(var odom_gate)" />             <!-- 2026-08-26 -->
+      <arg name="collision_reloc" value="$(var collision_reloc)" /> <!-- 2026-08-26 -->
+      <arg name="straight_ekf_blend_enable" value="$(var straight_ekf_blend_enable)" />
+    </include>
+  </group>
+
+  <!-- launch global parameter node -->
+  <node pkg="stack_master" name="global_parameters" exec="global_parameter_node">
+    <param name="racecar_version" value="$(var racecar_version)" />
+    <param name="sim" value="$(var sim)" />
+    <param name="map_path" value="$(var map_path)" />
+    <!-- Fails with l1 params for some reason
+    <param from="$(find-pkg-share stack_master)/config/$(var racecar_version)/l1_params.yaml" /> -->
+    <param name="use_sim_time" value="$(var sim)" />
+  </node>
+
+  <!-- launch global trajectory republisher via included launch -->
+  <include file="$(find-pkg-share global_planner)/launch/global_trajectory_publisher_launch.xml">
+    <arg name="map_path" value="$(var map_path)" />
+  </include>
+
+  <!-- 2026-08-22: rviz-only left/middle/right lane lines (/lane_markers) from /centerline_waypoints,
+       so the lanes are visible in spliner mode too (only lane_change_planner drew them before) -->
+  <node pkg="global_planner" name="lane_viz" exec="lane_viz">
+    <param name="lane_offset" value="0.3" />
+  </node>
+
+
+  <!-- launch sector tuner -->
+  <node pkg="sector_tuner" name="sector_tuner" exec="sector_tuner">
+    <param name="map_name" value="$(var map_name)" />
+    <param from="$(find-pkg-share stack_master)/maps/$(var map_name)/speed_scaling.yaml" />
+  </node>
+
+  <!-- launch ot sector tuner -->
+  <node pkg="sector_tuner" name="ot_interpolator" exec="ot_interpolator">
+    <param name="map_name" value="$(var map_name)" />
+    <param from="$(find-pkg-share stack_master)/maps/$(var map_name)/ot_sectors.yaml" />
+  </node>
+
+  <!-- launch lap analyser -->
+  <node pkg="lap_analyser" name="lap_analyser" exec="lap_analyser" output="screen" />
+
+  <!-- RViz race view -->
+  <node if="$(var rviz)" pkg="rviz2" exec="rviz2" name="rviz2"
+    args="-d $(find-pkg-share stack_master)/viz/head_to_head.rviz" output="log" />
+
+</launch>

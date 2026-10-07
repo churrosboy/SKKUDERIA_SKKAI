@@ -1,0 +1,66 @@
+/**:
+  # general parameters shared by all vesc-related nodes
+  ros__parameters:
+    # erpm (electrical rpm) = speed_to_erpm_gain * speed (meters / second) + speed_to_erpm_offset
+    speed_to_erpm_gain: 4352.0
+    speed_to_erpm_offset: 220.0
+
+    # servo value (0 to 1) =  steering_angle_to_servo_gain * steering angle (radians) + steering_angle_to_servo_offset
+    steering_angle_to_servo_gain: -1.1
+    steering_angle_to_servo_offset: 0.5
+
+    port: /dev/ttyACM0
+    duty_cycle_min: 0.0
+    duty_cycle_max: 0.0
+    current_min: 0.0
+    current_max: 100.0
+    brake_min: -20000.0
+    brake_max: 200000.0
+    speed_min: -69000.0
+    speed_max: 69000.0
+    position_min: 0.0
+    position_max: 0.0
+    servo_min: 0.15
+    servo_max: 0.85
+
+# No longer needed, all parameters are shared
+# ackermann_to_vesc_node:
+#   ros__parameters:
+
+vesc_to_odom_node:
+  ros__parameters:
+    odom_frame: odom
+    base_frame: base_link
+    # Override the shared /**: value of 220.0 for ODOMETRY ONLY.
+    # vesc_to_odom inverts erpm = gain*speed + offset, so at standstill (erpm=0)
+    # a 220.0 offset yields speed = -220/4352 = -0.0506 m/s: a phantom reverse
+    # creep that the EKF integrates forever. Measured parked drift was 5.12 cm/s,
+    # matching -0.0506 m/s to 1.3%. Left at 220.0 under /**: so the command path
+    # (ackermann_to_vesc_node) keeps its existing throttle deadband behaviour.
+    speed_to_erpm_offset: 0.0
+    # publish odom to base link tf
+    # Keep FALSE: with the EKF (mapping_launch / state_estimation) the EKF owns odom->base_link.
+    # The EKF-less baseline_mapping_launch overrides this to true via its own arg so the wheel
+    # odometry can own odom->base_link there. Two publishers of odom->base_link = TF conflict.
+    publish_tf: false
+    use_servo_cmd_to_calc_angular_velocity: true
+    # car wheelbase is about 25cm
+    wheelbase: .338
+
+# No longer needed, all parameters are shared
+# vesc_driver:
+#   ros__parameters:
+
+throttle_interpolator:
+  ros__parameters:
+    rpm_input_topic: commands/motor/unsmoothed_speed
+    rpm_output_topic: commands/motor/speed
+    servo_input_topic: commands/servo/unsmoothed_position
+    servo_output_topic: commands/servo/position
+
+    # servo smoother - limits acceleration and smooths anything above limit
+    max_acceleration: 7.0 # meters/second^2 (traction-limited; Velineon 3500 has torque to spare)
+    throttle_smoother_rate: 75.0 # messages/sec
+    # servo smoother - limits rotation speed and smooths anything above limit
+    max_servo_speed: 6.0 # radians/second (~90% of servo spec 0.09s/60deg ~= 6.7 rad/s steering via gain 1.1)
+    servo_smoother_rate: 75.0 # messages/sec

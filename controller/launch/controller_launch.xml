@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="LU_table" default="NUC5_hangar_pacejka"/>
+  <arg name="mode" default="MAP" description="Mode of operation: MAP / PP / (FTG). methods in brackets have not been implemented"/> <!-- TODO implement PP and MAPPING -->
+  <!-- 2026-08-21 C++ PP port: ctrl_exec selects the implementation.
+       controller     = python node (DEFAULT, unchanged behavior, all modes)
+       controller_cpp = C++ node (PP mode only; MAP/FTG refuse at startup,
+                        FTGONLY state holds a zeroed /drive) -->
+  <arg name="ctrl_exec" default="controller" description="controller (python) or controller_cpp (C++, PP only)"/>
+  <arg name="racecar_version" default="NUC2"/> <!-- for the C++ node's l1_params.yaml path -->
+
+  <!--  launch L1 controller -->
+  <!-- original python-only block (kept, now gated on ctrl_exec):
+  <node pkg="controller" name="controller" exec="controller">
+      <param name="mode" value="$(var mode)"/>
+      <param name="LU_table" value="$(var LU_table)"/>
+  </node>
+  -->
+  <node pkg="controller" name="controller" exec="controller"
+        unless="$(eval '\'$(var ctrl_exec)\' == \'controller_cpp\'')">
+      <param name="mode" value="$(var mode)"/>
+      <param name="LU_table" value="$(var LU_table)"/>
+  </node>
+
+  <!-- C++ PP controller: same node name + topics; l1 params arrive as standard
+       ROS param overrides from the same yaml the python node reads by hand.
+       NOTE: the <param from> line must NOT be added to the python block above
+       (its automatically_declare_parameters_from_overrides=True would collide
+       with the explicit declare_parameter calls). -->
+  <node pkg="controller" name="controller" exec="controller_cpp"
+        if="$(eval '\'$(var ctrl_exec)\' == \'controller_cpp\'')">
+      <param from="$(find-pkg-share stack_master)/config/$(var racecar_version)/l1_params.yaml"/>
+      <param name="mode" value="$(var mode)"/>
+      <param name="LU_table" value="$(var LU_table)"/>
+  </node>
+
+</launch>

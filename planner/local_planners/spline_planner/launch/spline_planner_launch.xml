@@ -1,0 +1,8 @@
+<launch>
+    <arg name="spliner_exec" default="spline_planner" description="spline_planner (C++, 2026-08-22 port) or spline_planner_python (legacy)" />
+
+    <!-- <node pkg="spline_planner" exec="spline_planner" name="spline_planner" output="screen"> -->
+    <node pkg="spline_planner" exec="$(var spliner_exec)" name="spline_planner" output="screen">
+    </node>
+
+</launch>

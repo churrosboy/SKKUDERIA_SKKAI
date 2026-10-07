@@ -1,0 +1,38 @@
+soslab_gl5:
+  ros__parameters:
+    lidarType: "GL5"
+    ip_address_device: "10.110.1.2"
+    ip_port_device: 2000
+    ip_address_pc: "10.110.1.3"
+    ip_port_pc: 3000
+    pc_topic_lidar0: "soslab/pointcloud"
+    # The GL-5 driver's cloud frame is yawed 90 deg from the optical center
+    # (sensor 0 deg = car nose, but cloud x-axis points sideways). The cloud is
+    # published as laser_raw and a static laser->laser_raw TF in bringup
+    # un-rotates it, so pc_to_scan (target_frame: laser) bins the full 270 deg.
+    frame_id: "laser_raw"
+    max_intensity: 3000
+
+pc_to_scan:
+  ros__parameters:
+    target_frame: "laser"
+    transform_tolerance: 0.01
+    # GL-5 is 2D; height filter is meaningless, open wide
+    min_height: -10.0
+    max_height:  10.0
+    # GL-5 spec: 270 deg FoV, 0.18 deg / beam, 40 Hz, 9 m range
+    # Bounds MUST match the real 270 deg FoV (+/- 135 deg = +/- 2.356 rad).
+    # Do NOT widen to +/- pi: the 90 deg blind sector then fills with inf, and
+    # cartographer treats inf as a MISS -- it carves free space out to
+    # missing_data_ray_length (5 m default) on every scan, punching rays
+    # straight through the track boundary behind the car.
+    angle_min: -2.356
+    angle_max:  2.356
+    angle_increment: 0.00314
+    scan_time: 0.025
+    # range_min: 0.1
+    range_min: 0.08
+    range_max: 9.0
+    use_inf: true
+    concurrency_level: 1
+  

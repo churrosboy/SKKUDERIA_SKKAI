@@ -1,0 +1,39 @@
+detect:
+  ros__parameters:
+    # rate: 40 # rate at which the node is running
+    # rate: 10 # lowered from 40: Jetson CPU saturation (load ~9), tracking is the pricey one
+    rate: 20 # 2026-08-22 back to 20 = tracking rate: at 10 Hz tracking (20 Hz, no stamp dedupe) consumed every detection TWICE -> vs estimate oscillated 0.67x-1.33x, KF re-inits, track churn (code-review finding)
+    lambda: 10 # minimum reliable detection angle in degrees
+    sigma: 0.03 # standard deviation of the lidar range noise in m
+    min_2_points_dist: 0.01 # minimum distance used by L-shape fitting
+    min_obs_size: 10 # minimum cluster size in lidar points
+    min_obs_size_m: 0.1 # minimum fitted obstacle size
+    # max_obs_size: 1.0
+    max_obs_size: 0.5 # was baked into perception_launch.xml; yaml is the source of truth now
+    new_cluster_threshold_m: 0.4
+    max_viewing_distance: 9.0
+    boundaries_inflation: 0.2
+    # filter_kernel_size: 11 # positive odd pixel count
+    filter_kernel_size: 11 # 0.35 m wall margin: verified phantom-free over 90s of laps (11 leaked wall flickers; min_obs_size_m must stay 0.1, box fits as small as 0.15)
+    max_tf_staleness: 0.05 # exact-stamp TF lookup races localization by 2-16 ms; fallback to latest TF is accepted up to this age (s)
+    map_name: test0811
+    measure: false
+    from_bag: false
+
+tracking:
+  ros__parameters:
+    # rate: 40 # rate at which the node is running
+    rate: 20 # lowered from 40: python node, ~44% CPU at 40 Hz
+    P_vs: 0.2 # proportional gain for the vs
+    P_d: 0.02 # proportional gain for the d
+    P_vd: 0.2 # proportional gain for the vd
+    measurment_var_s: 0.002 # variance of measurement noise in s
+    measurment_var_d: 0.002 # variance of measurement noise in d
+    measurment_var_vs: 0.2
+    measurment_var_vd: 0.2
+    process_var_vs: 2 # process velocity noise in s
+    process_var_vd: 8 # process velocity noise in d
+    max_dist: 0.5 # max distance for association
+    var_pub: 1 # obstacles with bigger variance are not published
+    measure: false
+    from_bag: false

@@ -1,0 +1,7 @@
+mapping_node:
+  ros__parameters:
+    rate: 10 # [hz]
+    occupancy_grid_threshold: 15 # 10
+    # 3, NOT 9: a 9x9 opening (x2 iterations) at 0.05 m/cell erodes ~0.45 m and
+    # splits thin track ribbons into disconnected blobs; 3 only removes speckle.
+    filter_kernel_size: 3

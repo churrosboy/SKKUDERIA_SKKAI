@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="map_path" description="Path to the map file (yaml or similar). Override with a launch arg or set MAP_PATH env var." />
+
+    <node pkg="global_planner" name="global_republisher" exec="global_trajectory_publisher">
+        <param name="map_path" value="$(var map_path)" />
+        <param name="publish_markers" value="true" />
+        <param name="publish_shortest_path" value="true" />
+        <!-- <param name="publish_centerline" value="false" /> -->
+        <!-- true since 2026-08-13: lane_change_planner needs /centerline_waypoints to build its lanes -->
+        <param name="publish_centerline" value="true" />
+        <param name="publish_lattice" value="false" />
+    </node>
+</launch>

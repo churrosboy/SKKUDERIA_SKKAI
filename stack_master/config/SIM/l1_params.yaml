@@ -1,0 +1,37 @@
+## L1 Controller Parameters (Lateral Control)
+controller:
+  ros__parameters:
+    t_clip_min: 1
+    t_clip_max: 5
+    m_l1: 0.3
+    q_l1: 0.15
+    speed_lookahead: 0
+    lat_err_coeff: 1
+
+    acc_scaler_for_steer: 1.0
+    dec_scaler_for_steer: 1.0 
+
+    start_scale_speed: 7.0
+    end_scale_speed: 8.0
+    downscale_factor: 0.2
+
+    speed_lookahead_for_steer: 0 # safe/agg 0/0 # increasing this to 0.20 AT MOST can make the car faster on the laptime but cut more corners
+
+
+    ## Trailing Controller Parameters
+    allow_accel_trailing: False
+    trailing_mode: True #True = Distance, False = Time
+    prioritize_dyn: True
+
+    trailing_gap: 1.5 # Distance in meters or gap in seconds, depending on mode
+    trailing_p_gain: 0.5
+    trailing_i_gain: 0.001
+    trailing_d_gain: 0.2
+    blind_trailing_speed: 1.5
+    trailing_vel_gain: 0.0 # [s] gap_should = trailing_gap + this * speed_now (0.0 = old fixed gap)
+    trailing_min_speed: 0.8 # [m/s] creep floor while gap > gap_should (visible targets too); 0.8 = known-good crawl from launch_creep_speed (0.5 stalled the motor), 0.0 = old stop-on-approach
+    trailing_creep_always: true # 2026-08-19 keep creeping at trailing_min_speed even AT/inside trailing_gap (down to trailing_stop_gap) so the car never stalls out in TRAILING and the FTG stuck timer cannot fire mid-gap; false = 0818 stop-at-gap behavior
+    # trailing_stop_gap: 0.8 # [m] (pre-0819b) raw frenet-s gap version
+    trailing_stop_gap: 0.3 # [m] 2026-08-19b: nose-to-obstacle-near-edge CLEARANCE below which trailing truly stops (gap - trailing_nose_offset - size/2); FTG can still fire there as last resort
+    trailing_nose_offset: 0.45 # [m] base_link->front bumper: 0.27 laser static TF + 0.18 collision_stop lidar_nose_offset (estimate, MEASURE IT)
+    use_sm_trailing_target: true # trailing target picked by state machine (/trailing_target); false = legacy controller-side pick

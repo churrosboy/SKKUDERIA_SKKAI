@@ -1,0 +1,26 @@
+<launch>
+    <arg name="param_file" description="Filepath to the opponent tracking/detection config file" />
+    <!-- <arg name="map_name" default="hangar_1905_v0" description="Map folder in stack_master/maps" /> -->
+    <arg name="map_name" default="latest" description="Map folder in stack_master/maps" />
+    <arg name="detector_exec" default="detect" description="detect (C++) or detect_python (legacy)" />
+    <arg name="tracker_exec" default="tracking" description="tracking (C++, 2026-08-22 port) or tracking_python (legacy)" />
+    <arg name="measure" default="false" description="Publish detector/tracker latency measurements" />
+
+    <node pkg="perception" name="detect" exec="$(var detector_exec)" output="log"
+        args="--ros-args --log-level info">
+        <param from= "$(var param_file)" />
+        <param name="map_name" value="$(var map_name)" />
+        <param name="measure" value="$(var measure)" />
+        <!-- tuning lives in the param_file yaml (opponent_tracker_params.yaml); FQN fixed so it applies now -->
+        <!-- <param name="filter_kernel_size" value="11" /> -->
+        <!-- <param name="max_obs_size" value="0.5" /> -->
+        <!-- <param name="min_obs_size" value="10" /> -->
+    </node>
+
+    <!-- <node pkg="perception" name="tracking" exec="tracking" output="log" -->
+    <node pkg="perception" name="tracking" exec="$(var tracker_exec)" output="log"
+        args="--ros-args --log-level warn">
+        <param from= "$(var param_file)" />
+        <param name="measure" value="$(var measure)" />
+    </node>
+</launch>

@@ -1,0 +1,27 @@
+ackermann_mux:
+  ros__parameters:
+    topics:
+      navigation:
+        topic   : drive
+        timeout : 0.2
+        priority: 10
+      joystick:
+        topic   : teleop
+        timeout : 0.2
+        priority: 100
+      # 2026-08-17: collision_stop node streams zero speed/steer here when a
+      # crash is detected. Above joystick so nothing overrides the stop; the
+      # 0.2 s timeout releases control as soon as the node stops publishing
+      # (button A reset).
+      emergency:
+        topic   : emergency
+        timeout : 0.2
+        priority: 200
+    # 2026-08-11: lock for press-toggle autonomy (RB). Engaged at startup and
+    # whenever autonomy_toggle stops publishing `false` (timeout 0.5s), which
+    # blocks `navigation` (priority 10) but never `joystick`/LB (priority 100).
+    locks:
+      pause:
+        topic   : pause_navigation
+        timeout : 0.5
+        priority: 50

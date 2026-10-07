@@ -1,0 +1,143 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="mapping_bool" default="True"/>
+    <arg name="map_name" default="hangar" />
+    <arg name="frenet_bool" default="False" />
+    <arg name="skip_early_fusion" default="False" />
+    <arg name="use_sim_time" default="False" />
+    <!-- 2026-08-20: straight-sector EKF blend in carstate (default off) -->
+    <arg name="straight_ekf_blend_enable" default="False" />
+
+    <!-- EKF IMU + Odom Fusion -->
+    <group unless="$(var skip_early_fusion)">
+        <include file="$(find-pkg-share state_estimation)/launch/ekf_launch.py"/>
+    </group>
+
+    <!--  LOCALIZATION -->
+    <arg name="slam_config_path" default="$(find-pkg-share stack_master)/config/$(var racecar_version)" />
+    <!-- 2026-08-20: which localization lua to run. Pass loc_lua:=f110_2d_loc_imu.lua to
+         feed the gyro directly into cartographer (use_imu_data=true); default is the
+         old IMU-less behavior. Threaded into the initialpose bridge too so trajectory
+         restarts use the same config. -->
+    <arg name="loc_lua" default="f110_2d_loc.lua" />
+    <!-- 2026-08-22: scan-to-map snap inside the initialpose bridge (see node docstring) -->
+    <arg name="initialpose_snap" default="True" />
+    <!-- 2026-08-25: apply the map yaml's initial_pose (or startup_pose:="x,y,yaw")
+         once after startup via the initialpose bridge; cartographer otherwise
+         starts at the map-frame origin (= where mapping began). Default OFF. -->
+    <arg name="startup_pose_enable" default="False" />
+    <arg name="startup_pose" default="[0.0]" />
+    <arg name="startup_delay_sec" default="3.0" />
+    <!-- 2026-08-26 hand-guided collision recovery (see initialpose_to_cartographer
+         docstring / odom_gate.py). odom_gate drops odometry to cartographer while
+         /collision_detected (spinning wheels / pushed car); collision_reloc arms the
+         bridge to relocalize from collision_stop/prior_pose once the car is pushed
+         back and put down. Both act ONLY during a collision_stop recovery. -->
+    <arg name="odom_gate" default="True" />
+    <arg name="collision_reloc" default="False" />
+    <!-- Crawl back to the source maps dir (same trick as mapping_launch): maps are
+         saved there at runtime, so reading via find-pkg-share would require a
+         rebuild after every mapping session. -->
+    <let name="map_path" value="$(find-pkg-prefix stack_master)/../../src/stack_master/maps/$(var map_name)" />
+
+    <!-- IF SLAM LOC ONLY -->
+    <group unless="$(var mapping_bool)">
+        <!-- start cartographer SLAM LOCALIZATION -->
+        <node name="cartographer_node" pkg="cartographer_ros"
+            exec="cartographer_node"
+            args="
+            -configuration_directory $(var slam_config_path)
+            -configuration_basename $(var loc_lua)
+            -load_state_filename $(var map_path)/$(var map_name).pbstream
+            --minloglevel 2">
+            <!-- <remap from="odom" to="early_fusion/odom" /> -->
+            <!-- 2026-08-26: through odom_gate (frames dropped during a collision) -->
+            <remap from="odom" to="early_fusion/odom_gated" />
+            <remap from="scan" to="/scan" />
+            <!-- 2026-08-20: only subscribed when the lua sets use_imu_data=true
+                 (f110_2d_loc_imu.lua); inert with the default lua. Gyro RATE only:
+                 cartographer ignores the msg orientation field, absolute heading
+                 still comes from scan matching. -->
+            <remap from="imu" to="/sensors/imu/raw" />
+            <param name="use_sim_time" value="$(var use_sim_time)" />
+        </node>
+
+        <!-- Bridge RViz "2D Pose Estimate" (/initialpose) to Cartographer's
+             finish_trajectory + start_trajectory services for instant relocalization -->
+        <node name="initialpose_to_cartographer" pkg="state_estimation"
+            exec="initialpose_to_cartographer" output="screen">
+            <param name="configuration_directory" value="$(var slam_config_path)" />
+            <!-- <param name="configuration_basename" value="f110_2d_loc.lua" /> -->
+            <!-- 2026-08-20: must match cartographer_node's lua or a trajectory restart
+                 via /initialpose would silently drop the IMU config -->
+            <param name="configuration_basename" value="$(var loc_lua)" />
+            <param name="use_sim_time" value="$(var use_sim_time)" />
+            <!-- 2026-08-22: refine the click against /map with the live /scan
+                 (+-0.5 m, +-15 deg window) before start_trajectory -->
+            <param name="snap_enable" value="$(var initialpose_snap)" />
+            <!-- 2026-08-25: one-shot startup relocalization (see arg comment) -->
+            <param name="startup_pose_enable" value="$(var startup_pose_enable)" />
+            <param name="startup_pose" value="$(var startup_pose)" />
+            <param name="startup_map_yaml" value="$(var map_path)/$(var map_name).yaml" />
+            <param name="startup_delay_sec" value="$(var startup_delay_sec)" />
+            <!-- 2026-08-26 hand-guided collision recovery (needs snap_enable) -->
+            <param name="collision_reloc_enable" value="$(var collision_reloc)" />
+        </node>
+
+        <!-- 2026-08-26: odometry gate for cartographer (see odom_gate.py) -->
+        <node name="odom_gate" pkg="state_estimation" exec="odom_gate" output="screen">
+            <param name="gate_enable" value="$(var odom_gate)" />
+            <param name="use_sim_time" value="$(var use_sim_time)" />
+        </node>
+
+        <!-- NOTE: no cartographer_occupancy_grid_node here on purpose — map_server
+             already publishes /map from the saved PNG; running both makes RViz
+             flicker between the static and live grids. -->
+
+        <!-- Launch map server with regular map name reads from OG MAP-->
+        <node pkg="nav2_map_server" name="map_server" exec="map_server" output="screen">
+            <param name="yaml_filename" value="$(var map_path)/$(var map_name).yaml" />
+            <param name="use_sim_time" value="$(var use_sim_time)" />
+        </node>
+        <node pkg="nav2_lifecycle_manager" name="lifecycle_manager" exec="lifecycle_manager"
+            output="screen">
+            <param name="autostart" value="True" />
+            <param name="node_names" value="[map_server]" />
+            <param name="use_sim_time" value="$(var use_sim_time)" />
+        </node>
+
+    </group>
+
+    <!-- ELIF SLAM MAPPING -->
+    <group if="$(var mapping_bool)">
+        <!-- start cartographer SLAM MAPPING -->
+        <node name="cartographer_node" pkg="cartographer_ros"
+            exec="cartographer_node"
+            args=" 
+            -configuration_directory $(var slam_config_path)
+            -configuration_basename f110_2d.lua
+            --minloglevel 2">
+            <remap from="odom" to="early_fusion/odom" />
+            <remap from="scan" to="/scan" />
+            <!-- 2026-08-20d: mapping lua now sets use_imu_data=true (unicorn port);
+                 gyro rate only, needs the zero-translation base_link->imu TF -->
+            <remap from="imu" to="/sensors/imu/raw" />
+            <param name="use_sim_time" value="$(var use_sim_time)" />
+        </node>
+
+        <node name="cartographer_occupancy_grid_node" pkg="cartographer_ros"
+            exec="cartographer_occupancy_grid_node" args="-resolution 0.05" >
+            <param name="use_sim_time" value="$(var use_sim_time)" />
+        </node>
+    </group>
+
+    <!-- Carstate Node -->
+    <node name="carstate_node" pkg="state_estimation" exec="carstate_node" args="" output='screen'>
+        <remap from="/odom_out" to="/car_state/odom" />
+        <param name="frenet_bool" value="$(var frenet_bool)" />
+        <param name="use_sim_time" value="$(var use_sim_time)" />
+        <!-- 2026-08-20 straight-sector EKF blend kill switch (see straight_blender.py) -->
+        <param name="straight_ekf_blend_enable" value="$(var straight_ekf_blend_enable)" />
+    </node>
+
+</launch>

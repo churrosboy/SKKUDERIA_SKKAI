@@ -1,0 +1,53 @@
+<launch>
+    <arg name="racecar_version" default="NUC2" />
+    <arg name="LU_table" default="NUC2_hangar_pacejka" />
+    <arg name="overtake_mode" default="spliner" /> <!--  spliner / graph_based / lane_change / sqp -->
+    <arg name="ctrl_algo" default="MAP"/> <!-- MAP / PP -->
+    <arg name="ctrl_exec" default="controller" /> <!-- 2026-08-21: controller (python) / controller_cpp (C++ PP port) -->
+    <arg name="measure" default="False" />
+    <arg name="tracker_exec" default="tracking" description="tracking (C++, 2026-08-22 port) or tracking_python (legacy)" />
+    <arg name="spliner_exec" default="spline_planner" description="spline_planner (C++, 2026-08-22 port) or spline_planner_python (legacy)" />
+    <!-- <arg name="map_name" default="hangar_1905_v0" /> -->
+    <!-- <arg name="map_name" default="test0811" /> -->
+    <arg name="map_name" default="latest" />
+
+    <!-- launch controller manager -->
+    <include file="$(find-pkg-share controller)/launch/controller_launch.xml">
+        <arg name="mode" value="$(var ctrl_algo)"/>
+        <arg name="ctrl_exec" value="$(var ctrl_exec)"/> <!-- 2026-08-21 C++ PP port switch -->
+        <arg name="racecar_version" value="$(var racecar_version)"/>
+    </include>
+    
+    <!-- launch state machine -->
+    <include file="$(find-pkg-share state_machine)/launch/state_machine_launch.xml">
+        <arg name="mode" value="head_to_head"/>
+        <arg name="overtake_mode" value="$(var overtake_mode)"/>
+    </include>
+
+    <!-- SPLINE PLANNER-->
+    <!-- this is actually the only way this works -->
+    <group if="$(eval '\'$(var overtake_mode)\' == \'spliner\'')">
+        <include file="$(find-pkg-share spline_planner)/launch/spline_planner_launch.xml">
+            <arg name="spliner_exec" value="$(var spliner_exec)" />
+        </include>
+    </group>
+
+    <!-- LANE CHANGE PLANNER (ported from unicorn-racing-stack) -->
+    <group if="$(eval '\'$(var overtake_mode)\' == \'lane_change\'')">
+        <include file="$(find-pkg-share lane_change_planner)/launch/lane_change_planner_launch.xml" />
+    </group>
+
+    <!-- SQP PLANNER (ported from unicorn-racing-stack) -->
+    <group if="$(eval '\'$(var overtake_mode)\' == \'sqp\'')">
+        <include file="$(find-pkg-share sqp_planner)/launch/sqp_planner_launch.xml" />
+    </group>
+
+    <!-- PERCEPTION -->
+    <include file="$(find-pkg-share perception)/launch/perception_launch.xml">
+        <arg name="param_file" value="$(find-pkg-share stack_master)/config/opponent_tracker_params.yaml" />
+        <arg name="map_name" value="$(var map_name)" />
+        <arg name="measure" value="$(var measure)" />
+        <arg name="tracker_exec" value="$(var tracker_exec)" />
+    </include>
+    
+</launch>

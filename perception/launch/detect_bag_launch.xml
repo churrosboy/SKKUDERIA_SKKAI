@@ -1,0 +1,26 @@
+<launch>
+    <arg name="param_file" default="$(find-pkg-share stack_master)/config/opponent_tracker_params.yaml" />
+    <arg name="bag_file" default="path_to_your_rosbag.bag" description="Path to the rosbag file to play" />
+    <arg name="map_name" default="hangar_1905_v0" description="Map folder in stack_master/maps" />
+    <arg name="detector_exec" default="detect" description="detect (C++) or detect_python (legacy)" />
+    <arg name="tracker_exec" default="tracking" description="tracking (C++, 2026-08-22 port) or tracking_python (legacy)" />
+
+    <node pkg="perception" name="detect" exec="$(var detector_exec)" output="log"
+        args="--ros-args --log-level info">
+        <param from= "$(var param_file)" />
+        <param name="use_sim_time" value="true" />
+        <param name="map_name" value="$(var map_name)" />
+        <param name="from_bag" value="true" />
+    </node>
+
+    <!-- <node pkg="perception" name="tracking" exec="tracking" output="log" -->
+    <node pkg="perception" name="tracking" exec="$(var tracker_exec)" output="log"
+        args="--ros-args --log-level warn">
+        <param from= "$(var param_file)" />
+        <param name="use_sim_time" value="true" />
+        <param name="from_bag" value="true" />
+    </node>
+
+    <!-- Play the ROS bag -->
+    <executable cmd="ros2 bag play $(var bag_file) --topics /tf /tf_static /scan /car_state/frenet/odom /global_waypoints --clock" output="screen" />
+</launch>

@@ -1,0 +1,8 @@
+# 2026-08-22: added so PP mode can start while global_params.yaml has sim: true.
+# The PP controller (python init_pp_controller and C++ readWheelbase) reads
+# wheelbase = lr + lf from THIS file when sim is true, and NUC2 had no
+# sim_params.yaml -> PP mode crashed at startup regardless of exec.
+# Only lr + lf is consumed for NUC2 (gym bridge only reads the SIM copy).
+# lr + lf = 0.338 m, matching vesc.yaml vesc_to_odom_node wheelbase.
+lf: 0.163 # Distance from center of gravity to front axle (split estimated)
+lr: 0.175 # Distance from center of gravity to rear axle (split estimated)

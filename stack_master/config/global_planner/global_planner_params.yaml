@@ -1,0 +1,12 @@
+global_planner:
+  ros__parameters:
+    rate: 10 # [hz]
+    safety_width: 0.5 # [m] including the width of the car
+    safety_width_sp: 0.5 # [m] including the width of the car for shortest path optimization
+    # Extra margin per wall [m], on top of the symmetric safety_width/2 the optimizer already
+    # keeps. Distance held from a wall = safety_width/2 + extra_margin_<side>. Both 0.0
+    # reproduces the symmetric behaviour exactly. Shared by the iqp and shortest-path passes.
+    extra_margin_inner: 0.2 # infield wall (inside of the corners)
+    extra_margin_outer: 0.2 # track perimeter
+    reverse_mapping: False # By default, do not reverse the direction of the track
+    show_plots: False

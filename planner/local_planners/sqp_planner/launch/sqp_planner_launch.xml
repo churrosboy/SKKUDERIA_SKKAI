@@ -1,0 +1,11 @@
+<launch>
+
+    <node pkg="sqp_planner" exec="sqp_avoidance_node" name="sqp_avoidance_node" output="screen">
+    </node>
+
+    <!-- Publishes /global_waypoints_updated (raceline speeds overwritten with measured
+         ego speed during GB_TRACK); the SQP node reads it for its turning-radius speed. -->
+    <node pkg="sqp_planner" exec="update_waypoints" name="waypoint_updater" output="screen">
+    </node>
+
+</launch>

@@ -1,0 +1,24 @@
+<!-- -*- mode: XML -*- -->
+<launch>
+    <arg name="racecar_version" default="$(env RACECAR_VERSION)" description="'SIM' / 'NUCx'" />
+    <!-- 2026-08-25: passed through to bringup_launch.py (collision_stop / collision_stop_cpp) -->
+    <!-- <arg name="collision_exec" default="collision_stop" description="collision_stop (python) or collision_stop_cpp (C++ port)" /> -->
+    <arg name="collision_exec" default="collision_stop_cpp" description="collision_stop_cpp (C++ port, default since 2026-08-25) or collision_stop (python)" />
+    <!-- 2026-08-26b: collision_stop enable_auto_recovery (base_system_launch collision_reverse) -->
+    <arg name="collision_reverse" default="True" description="reverse after a collision trip (True) or stop-and-latch only (False)" />
+
+    <let name="joy_teleop_config" value="$(find-pkg-share stack_master)/config/$(var racecar_version)/joy_teleop.yaml" />
+    <let name="vesc_config" value="$(find-pkg-share stack_master)/config/$(var racecar_version)/vesc.yaml" />
+    <let name="sensors_config" value="$(find-pkg-share stack_master)/config/sensors.yaml" />
+    <let name="mux_config" value="$(find-pkg-share stack_master)/config/mux.yaml" />
+
+    <!-- launch teleop -->
+    <include file="$(find-pkg-share f1tenth_stack)/launch/bringup_launch.py">
+        <arg name="joy_config" value="$(var joy_teleop_config)" />
+        <arg name="vesc_config" value="$(var vesc_config)" />
+        <arg name="sensors_config" value="$(var sensors_config)" />
+        <arg name="mux_config" value="$(var mux_config)" />
+        <arg name="collision_exec" value="$(var collision_exec)" /> <!-- 2026-08-25 C++ collision_stop switch -->
+        <arg name="collision_reverse" value="$(var collision_reverse)" /> <!-- 2026-08-26b stop-only switch -->
+    </include>
+</launch>
